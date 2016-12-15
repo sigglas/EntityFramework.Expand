@@ -2,3 +2,4 @@
 /EntityFramework.Expand/bin
 /EntityFramework.Expand/EntityFramework.Expand.csproj.user
 /.vs
+/*.suo
