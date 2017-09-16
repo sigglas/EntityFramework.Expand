@@ -6,65 +6,49 @@ using System.Data.Entity;
 using System.Linq;
 using System.Text;
 
-//Entity Model Sp Core
-namespace EntityFramework.Expand.ProcedureCore
+//Entity Model Funcs Core
+namespace EntityFramework.Expand.FunctionsCore
 {
-
     /// <summary>
-    /// 提供建立回應SQL預存程序列舉結果的剖析器
+    /// 提供建立回應SQL函數列舉結果的剖析器
     /// </summary>
     /// <typeparam name="TEntity">預存的個體</typeparam>
     /// <typeparam name="Tout">輸出的列舉</typeparam>
-    /// <exception cref="EntityProcedureAttributeException">當調用預存個體前，發生的例外</exception>
-    public class SpListSet<TEntity, Tout> : IProcedure<TEntity, Tout>, IEnumerable<Tout>, IEnumerable
+    /// <exception cref="EntityFunctionsAttributeException">當調用預存個體前，發生的例外</exception>
+    public class FuncListSet<TEntity, Tout> : ITableValuedFunctions<TEntity, Tout>, IEnumerable<Tout>, IEnumerable
         where TEntity : class, new()
         where Tout : class
     {
         private DbContext _contextModel;
 
         /// <summary>
-        /// 提供建立回應SQL預存程序列舉結果的剖析器
+        /// 提供建立回應SQL函數列舉結果的剖析器
         /// </summary>
         /// <param name="contextModel">Entity執行個體</param>
-        public SpListSet(DbContext contextModel)
+        public FuncListSet(DbContext contextModel)
         {
             // TODO: Complete member initialization
             this.ObjectState = false;
             this._contextModel = contextModel;
         }
 
-        #region IProcedure
-        /// <summary>
-        /// 預存預設回應的方式
-        /// </summary>
-        private int _returnCode { get; set; }
+        #region ITableValuedFunctions
 
         /// <summary>
         /// 預存參數
         /// </summary>
         private TEntity _Parameter { get; set; }
-        /// <summary>
-        /// 設定預存參數
-        /// </summary>
-        public TEntity Parameter
-        {
-            set
-            {
-                this.ObjectState = false;
-                this._Parameter = value;
-            }
-        }
-
-        /// <summary>
-        /// 取得執行結果
-        /// </summary>
-        /// <returns></returns>
-        public TEntity GetParameter()
-        {
-            if (this.ObjectState == false)
-                throw new Exception("從上一次變更後尚未執行Run()結果");
-            return this._Parameter.Clone();
-        }
+        ///// <summary>
+        ///// 設定預存參數
+        ///// </summary>
+        //public TEntity Parameter
+        //{
+        //    set
+        //    {
+        //        this.ObjectState = false;
+        //        this._Parameter = value;
+        //    }
+        //}
 
         /// <summary>
         /// 執行結果回應的物件集合
@@ -76,7 +60,7 @@ namespace EntityFramework.Expand.ProcedureCore
         /// </summary>
         /// <param name="selector"></param>
         /// <returns></returns>
-        public IProcedure<TEntity, Tout> Run(Action<TEntity> selector)
+        public ITableValuedFunctions<TEntity, Tout> Set(Action<TEntity> selector)
         {
             this._Parameter = new TEntity();
             selector.Invoke(this._Parameter);
@@ -89,16 +73,27 @@ namespace EntityFramework.Expand.ProcedureCore
         /// 使用外定義的方式執行，此時以Parameter屬性作為設定值
         /// </summary>
         /// <returns></returns>
-        public int Run()
+        public ITableValuedFunctions<TEntity, Tout> Set(TEntity parameter)
         {
-            if (this._Parameter == null)
-                throw new EntityProcedureAttributeException(typeof(TEntity).Name + "預存程序參數尚未設定，無法執行並取得執行結果的列舉值，請先設定Parameter再執行Run()後才能取用列舉。");
+            if (parameter == null)
+                throw new EntityFunctionsAttributeException(typeof(TEntity).Name + "函數參數尚未設定，無法執行並取得執行結果的列舉值，執行Set()請設定Parameter才能取用列舉。");
+
+            this._Parameter = parameter;
 
             this.RunIt();
-            return this._returnCode;
+            return this;
         }
         private void RunIt()
         {
+
+            /*
+        exec sp_executesql N'SELECT
+        [Extent1].*
+        FROM [dbo].[GetPrecisionMarketingUsers](@p0, @p1, @p2, @p3, @p4, @p5)  AS [Extent1]',N'@p0 tinyint, @p1 int, @p2 tinyint, @p3 tinyint, @p4 decimal(19,2), @p5 int'
+        ,@p0 = null,@p1 = null,@p2 = null,@p3 = null,@p4 = null,@p5 =  null
+            */
+
+
             //0:sp name 1:pars
             StringBuilder sbPar = new StringBuilder();
 
@@ -111,7 +106,7 @@ namespace EntityFramework.Expand.ProcedureCore
             {
                 nowCount++;
 
-                EntityProcedureAttribute CustType = (EntityProcedureAttribute)Attribute.GetCustomAttribute(p, typeof(EntityProcedureAttribute));
+                EntityFunctionsAttribute CustType = (EntityFunctionsAttribute)Attribute.GetCustomAttribute(p, typeof(EntityFunctionsAttribute));
 
                 object value = p.GetValue(this._Parameter, null);
 
@@ -121,7 +116,7 @@ namespace EntityFramework.Expand.ProcedureCore
                     sbPar.Append(this.CreateParameters(value, p, CustType, out sqlParameter));
                     if (sqlParameter == null)
                     {
-                        throw new EntityProcedureAttributeException("找不到SqlParameter，產生預存程序參數時發生錯誤 屬性名稱：" + p.Name);
+                        throw new EntityFunctionsAttributeException("找不到SqlParameter，產生函數參數時發生錯誤 屬性名稱：" + p.Name);
                     }
                     else
                     {
@@ -134,55 +129,17 @@ namespace EntityFramework.Expand.ProcedureCore
                 }
             }
 
-            var returnCode = new System.Data.SqlClient.SqlParameter();
-            returnCode.ParameterName = "@Return_value";
-            returnCode.SqlDbType = System.Data.SqlDbType.Int;
-            returnCode.Direction = System.Data.ParameterDirection.Output;
-            sqlParameters.Add("Return_value", returnCode);
-
-            string execCommand = string.Format(@"EXEC @Return_value = {0} {1}", this._Parameter.GetType().Name, sbPar.ToString());
+            string schema = "dbo";
+            string execCommand = string.Format(@"SELECT * FROM [{0}].[{1}]({2})",
+                schema, this._Parameter.GetType().Name, sbPar.ToString());
 
             var inPar = sqlParameters.Values.ToArray();
             this._RuntimeSource = this._contextModel.Database.SqlQuery<Tout>(execCommand, inPar).ToList().GetEnumerator();
-
-            sqlParameters.ToList().ForEach(item =>
-            {
-                switch (item.Value.Direction)
-                {
-                    case System.Data.ParameterDirection.InputOutput:
-                    case System.Data.ParameterDirection.Output:
-                    case System.Data.ParameterDirection.ReturnValue:
-                        foreach (var p in this._Parameter.GetType().GetProperties())
-                        {
-                            if (p.Name == item.Key)
-                            {
-                                var value = item.Value.Value;
-                                var t = Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType;
-                                var safeValue = (value == null) ? null : (value == DBNull.Value) ? null : Convert.ChangeType(value, t);
-                                p.SetValue(this._Parameter, safeValue);
-                            }
-                        }
-                        break;
-                }
-            });
-
-            if (returnCode == null)
-            {
-                this._returnCode = -1;
-            }
-            else
-            { 
-                int codeValue;
-                bool tryit = int.TryParse(returnCode.Value.ToString(), out codeValue);
-                if (tryit == true)
-                {
-                    this._returnCode = codeValue;
-                }
-            }
+            
             this.ObjectState = true;
         }
 
-        private string CreateParameters(object value, System.Reflection.MemberInfo p, EntityProcedureAttribute custType, out System.Data.SqlClient.SqlParameter sqlParameter)
+        private string CreateParameters(object value, System.Reflection.MemberInfo p, EntityFunctionsAttribute custType, out System.Data.SqlClient.SqlParameter sqlParameter)
         {
             string resultCmd = string.Empty;
             string parameterName = string.Empty;
@@ -259,30 +216,13 @@ namespace EntityFramework.Expand.ProcedureCore
                     parameterName = sqlParameter.ParameterName = p.Name;
                 }
 
-                string Cmd = " @{0} = @{0} {1}";
-                if (custType.Direction.HasValue)
-                {
-                    sqlParameter.Direction = custType.Direction.Value;
-                    switch (custType.Direction.Value)
-                    {
-                        case System.Data.ParameterDirection.Output:
-                        case System.Data.ParameterDirection.InputOutput:
-                            resultCmd = string.Format(Cmd, parameterName, "Output");
-                            break;
-                        default:
-                            resultCmd = string.Format(Cmd, parameterName, string.Empty);
-                            break;
-                    }
-                }
-                else
-                {
-                    resultCmd = string.Format(Cmd, parameterName, string.Empty);
-                }
+                string Cmd = " @{0} ";
+                resultCmd = string.Format(Cmd, parameterName);
 
             }
             else
             {
-                throw new EntityProcedureAttributeException(p.Name + "屬性找不到EntityProcedureAttribute，請確定是否已定義此設定。");
+                throw new EntityFunctionsAttributeException(p.Name + "屬性找不到EntityFunctionsAttribute，請確定是否已定義此設定。");
             }
 
 
@@ -296,11 +236,11 @@ namespace EntityFramework.Expand.ProcedureCore
         public IEnumerator<Tout> GetEnumerator()
         {
             if (this._Parameter == null)
-                throw new EntityProcedureAttributeException(typeof(TEntity).Name + "預存程序參數尚未設定，無法執行並取得執行結果的列舉值，請先設定Parameter再執行Run()後才能取用列舉。");
+                throw new EntityFunctionsAttributeException(typeof(TEntity).Name + "函數參數尚未設定，無法執行並取得執行結果的列舉值，請先設定Parameter再執行Set()後才能取用列舉。");
             if (this._RuntimeSource == null)
-                throw new EntityProcedureAttributeException(typeof(TEntity).Name + "預存程序尚未執行，無法取得執行結果的列舉值，請先執行Run()再叫用列舉。");
+                throw new EntityFunctionsAttributeException(typeof(TEntity).Name + "函數尚未執行，無法取得執行結果的列舉值，請先執行Set()再叫用列舉。");
             if (this.ObjectState == false)
-                throw new Exception("從上一次變更後尚未執行Run()結果");
+                throw new Exception("從上一次變更後尚未執行Set()結果");
             else
                 return this._RuntimeSource;
         }
@@ -308,25 +248,14 @@ namespace EntityFramework.Expand.ProcedureCore
         IEnumerator IEnumerable.GetEnumerator()
         {
             if (this._Parameter == null)
-                throw new EntityProcedureAttributeException(typeof(TEntity).Name + "預存程序參數尚未設定，無法執行並取得執行結果的列舉值，請先設定Parameter再執行Run()後才能取用列舉。");
+                throw new EntityFunctionsAttributeException(typeof(TEntity).Name + "函數參數尚未設定，無法執行並取得執行結果的列舉值，請先設定Parameter再執行Set()後才能取用列舉。");
             if (this._RuntimeSource == null)
-                throw new EntityProcedureAttributeException(typeof(TEntity).Name + "預存程序尚未執行，無法取得執行結果的列舉值，請先執行Run()再叫用列舉。");
+                throw new EntityFunctionsAttributeException(typeof(TEntity).Name + "函數尚未執行，無法取得執行結果的列舉值，請先執行Set()再叫用列舉。");
             else
                 return this._RuntimeSource;
         }
 
 
         bool ObjectState = false;
-
-        /// <summary>
-        /// 預存的執行結果回傳CODE 
-        /// </summary>
-        /// <returns>若為-1則可能是執行失敗</returns>
-        public int GetReturnCode()
-        {
-            if (this.ObjectState == false)
-                throw new Exception("從上一次變更後尚未執行Run()結果");
-            return _returnCode;
-        }
     }
 }

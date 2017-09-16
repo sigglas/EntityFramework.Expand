@@ -48,6 +48,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FunctionsCore\EntityFunctionsAttribute.cs" />
+    <Compile Include="FunctionsCore\FuncListSet.cs" />
+    <Compile Include="FunctionsCore\IFunctions.cs" />
     <Compile Include="Linq.cs" />
     <Compile Include="ProcedureCore\EntityProcedureAttribute.cs" />
     <Compile Include="ProcedureCore\IProcedure.cs" />

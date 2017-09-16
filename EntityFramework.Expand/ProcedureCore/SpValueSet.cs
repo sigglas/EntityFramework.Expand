@@ -148,7 +148,7 @@ namespace EntityFramework.Expand.ProcedureCore
                             {
                                 var value = item.Value.Value;
                                 var t = Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType;
-                                var safeValue = (value == null) ? null : Convert.ChangeType(value, t);
+                                var safeValue = (value == null) ? null : (value == DBNull.Value) ? null  :  Convert.ChangeType(value, t);
                                 p.SetValue(this._Parameter, safeValue);
                             }
                         }
