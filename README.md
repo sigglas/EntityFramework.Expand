@@ -56,7 +56,7 @@ Step4 : use it!
                 par.p1 = 1;
             });
 
-            //get ReturnCode from 'return 1' or other
+            //get ReturnCode from 'return 1' or other return
             var code = obj.GetReturnCode();
             
             //get list from table select 
