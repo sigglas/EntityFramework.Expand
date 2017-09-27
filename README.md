@@ -77,4 +77,4 @@ Step4 : use it!
     string value = p.p2;
     
 >
-design : 2015-2017
+Original design by 2015-2017
